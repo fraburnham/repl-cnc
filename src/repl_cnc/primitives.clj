@@ -20,7 +20,7 @@
   (let [sign (if (pos? end) + -)
         end (Math/abs end)]
     (loop [stepovers []
-           distance-remaining (- end tool-width)]
+           distance-remaining (- end tool-width)] ;; initial hole (should add the 0th stepover then...
       (if (zero? distance-remaining)
         stepovers
         (let [stepover (next-stepover tool-width stepover-amount distance-remaining)]
@@ -70,8 +70,6 @@
 (defn circle-slot
   "Doesn't account for any home reference except bottom for now"
   [config radius z-end]
-  ;; I is the X offset to the center of the circle
-  ;; J is the Y offset to the center of the circle
   ;; There is a gcode to change the plane for the arc! 2.5d repl carving
   (let [steps (Math/ceil (/ z-end (:plunge-depth config)))]
     (-> (reduce
@@ -85,23 +83,24 @@
 
 (defn radius-scale
   "Return a seq that has the correct radius for each stepover step"
-  [tool-width stepovers]
-  (reduce
-   (fn [radii stepover-distance]
-     (conj radii (+
-                  (last radii)
-                  (/ stepover-distance 2)
-                  )))
-   [0]
-   stepovers))
+  [stepovers]
+  (->> (reduce
+        (fn [radii stepover-distance]
+          (conj radii (+
+                       (last radii)
+                       stepover-distance)))
+        [0]
+        stepovers)
+       (map -)))
 
 (defn circle-hole
-  "The start of the hole is the 'center-top' or 'center-bottom' depending on `y-end`'s sign"
-  [config radius y-end z-end stepover-amount]
-  (let [stepovers (stepovers (:tool-width config) stepover-amount y-end)
-        radii (radius-scale (:tool-width config) stepovers)]
+  "The start of the hole is centroid"
+  [config radius z-end stepover-amount]
+  ;; use half of tool width since we're working w/ radius stepovers (and double stepover since it is a pct of total tool)
+  (let [stepovers (stepovers (float (/ (:tool-width config) 2)) (* stepover-amount 2) (float (/ radius 2)))
+        radii (radius-scale stepovers)]
     (reduce (fn [steps [y-step radius]]
-              (-> (conj steps (gcode/relative-move config 0 (- y-step) 0))
+              (-> (conj steps (gcode/relative-move config 0 y-step 0))
                   (into (circle-slot config radius z-end))))
             []
             (->> (interleave (into [0] stepovers) radii)
