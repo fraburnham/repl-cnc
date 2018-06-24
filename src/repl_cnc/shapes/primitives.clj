@@ -1,11 +1,5 @@
-(ns repl-cnc.primitives
+(ns repl-cnc.shapes.primitives
   (:require [repl-cnc.gcode :as gcode]))
-
-(defn with-spindle
-  [config steps]
-  (as-> [(gcode/start-spindle config)] *
-    (apply conj * steps)
-    (conj * gcode/stop-spindle)))
 
 (defn next-stepover
   [tool-width stepover-amount distance-remaining]
@@ -35,7 +29,10 @@
     end
     (- end tool-width)))
 
-(defn slot
+;; add some consideration for mill style
+;; for now just do single passes if the mill style is set (assume the caller knows the details)
+;; this is to get around some shitty edges in ebony line-pockets
+(defn line-pocket
   "Assumes you're starting from relative zero
    z-end and plunge-depth-mm will be negative"
   [config x-end y-end z-end]
@@ -58,16 +55,20 @@
          (range steps))
         (conj (gcode/plunge config (- z-end))))))
 
-(defn box-hole
+;; boxes only work w/ even depths!
+;; Use local home after retraction?
+(defn square-pocket
   "Recursively build the box hole steps assuming bounds are max limits for the outside of the tool"
   [config x-end y-end z-end stepover-amount]
   (-> (reduce (fn [steps y-step]
                 (-> (conj steps (gcode/relative-move config 0 y-step 0))
-                    (into (slot config x-end 0 z-end))))
-              (into [gcode/local-home] (slot config x-end 0 z-end))
+                    (into (line-pocket config x-end 0 z-end))))
+              ;; the local home here is unused, I should be able to use it after each line-pocket
+              ;; If I set it before each line-pocket
+              (into [gcode/local-home] (line-pocket config x-end 0 z-end))
               (stepovers (:tool-width config) stepover-amount y-end))))
 
-(defn circle-slot
+(defn arc-pocket
   "Doesn't account for any home reference except bottom for now"
   [config radius z-end]
   ;; There is a gcode to change the plane for the arc! 2.5d repl carving
@@ -93,15 +94,15 @@
         stepovers)
        (map -)))
 
-(defn circle-hole
+(defn circle-pocket
   "The start of the hole is centroid"
-  [config radius z-end stepover-amount]
+  [config diameter z-end stepover-amount]
   ;; use half of tool width since we're working w/ radius stepovers (and double stepover since it is a pct of total tool)
-  (let [stepovers (stepovers (float (/ (:tool-width config) 2)) (* stepover-amount 2) (float (/ radius 2)))
+  (let [stepovers (stepovers (float (/ (:tool-width config) 2)) (* stepover-amount 2) (float (/ diameter 2)))
         radii (radius-scale stepovers)]
     (reduce (fn [steps [y-step radius]]
               (-> (conj steps (gcode/relative-move config 0 y-step 0))
-                  (into (circle-slot config radius z-end))))
+                  (into (arc-pocket config radius z-end))))
             []
             (->> (interleave (into [0] stepovers) radii)
                  (partition 2)))))
