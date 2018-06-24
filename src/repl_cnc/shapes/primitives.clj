@@ -84,20 +84,23 @@
 
 (defn radius-scale
   "Return a seq that has the correct radius for each stepover step"
-  [stepovers]
-  (->> (reduce
-        (fn [radii stepover-distance]
-          (conj radii (+
-                       (last radii)
-                       stepover-distance)))
-        [0]
-        stepovers)
-       (map -)))
+  ([stepovers]
+   (radius-scale stepovers 0))
+  ([stepovers offset]
+   (->> (reduce
+         (fn [radii stepover-distance]
+           (conj radii (+
+                        (last radii)
+                        stepover-distance)))
+         [0]
+         stepovers)
+        (map #(- (+ offset %))))))
 
 (defn circle-pocket
   "The start of the hole is centroid"
   [config diameter z-end stepover-amount]
   ;; use half of tool width since we're working w/ radius stepovers (and double stepover since it is a pct of total tool)
+  ;; this math is stupid. Fix it (after tests are added)
   (let [stepovers (stepovers (float (/ (:tool-width config) 2)) (* stepover-amount 2) (float (/ diameter 2)))
         radii (radius-scale stepovers)]
     (reduce (fn [steps [y-step radius]]

@@ -7,4 +7,7 @@
     (apply conj * steps)
     (conj * gcode/stop-spindle)))
 
-;; once I get a laser head...
+(defn working-tool-width
+  [config stepover-amount]
+  (* (:tool-width config)
+     stepover-amount))
