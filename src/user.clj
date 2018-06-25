@@ -3,7 +3,10 @@
             [repl-cnc
              [core :as repl-cnc]
              [gcode :as gcode]
-             [primitives :as shapes]]
+             [tools :as tools]]
+            [repl-cnc.shapes
+             [primitives :as shapes]
+             [ring :as ring]]
             [repl-cnc.serial.proto :as serial]))
 
 (defonce system nil)
