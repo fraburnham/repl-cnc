@@ -11,10 +11,12 @@
   "Calculate the relative moves needed for a given tool config to reach but not exceed end point
    stepover amount should always be positive"
   [tool-width stepover-amount end]
+  {:pre [(pos? tool-width)]}
   (let [sign (if (pos? end) + -)
-        end (Math/abs end)]
+        end (Math/abs end)
+        stepover-amount (Math/abs stepover-amount)]
     (loop [stepovers []
-           distance-remaining (- end tool-width)] ;; initial hole (should add the 0th stepover then...
+           distance-remaining end]
       (if (zero? distance-remaining)
         stepovers
         (let [stepover (next-stepover tool-width stepover-amount distance-remaining)]
@@ -37,14 +39,14 @@
    z-end and plunge-depth-mm will be negative"
   [config x-end y-end z-end]
   ;; protect against invalid pluge-depth rates
-  (let [steps (Math/ceil (Math/abs (/ z-end (:plunge-depth config))))
-        cut-direction-map {0 +
+  (let [stepdowns (stepovers (Math/abs (:plunge-depth config)) 1 z-end) ; gotta make sure these work w/ negatives innit
+        cut-direction-map {0 + ; this seems fragile
                            1 -}]
     (-> (reduce
-         (fn [r i]
+         (fn [r [i stepdown]]
            (let [cut-direction-modifier (get cut-direction-map (mod i 2))]
              (conj r
-                   (gcode/plunge config)
+                   (gcode/plunge config stepdown)
                    (gcode/relative-move config
                                         (cut-direction-modifier
                                          (end-offset (:tool-width config) x-end))
@@ -52,11 +54,10 @@
                                          (end-offset (:tool-width config) y-end))
                                         0))))
          []
-         (range steps))
+         (->> (interleave (range (count stepdowns)) stepdowns)
+              (partition 2)))
         (conj (gcode/plunge config (- z-end))))))
 
-;; boxes only work w/ even depths!
-;; Use local home after retraction?
 (defn square-pocket
   "Recursively build the box hole steps assuming bounds are max limits for the outside of the tool"
   [config x-end y-end z-end stepover-amount]
@@ -72,14 +73,14 @@
   "Doesn't account for any home reference except bottom for now"
   [config radius z-end]
   ;; There is a gcode to change the plane for the arc! 2.5d repl carving
-  (let [steps (Math/ceil (/ z-end (:plunge-depth config)))]
+  (let [stepdowns (stepovers (Math/abs (:plunge-depth config)) 1 z-end)]
     (-> (reduce
-         (fn [r i]
+         (fn [r stepdown]
            (conj r
-                 (gcode/plunge config)
+                 (gcode/plunge config stepdown)
                  (gcode/arc config 0 0 0 radius)))
          []
-         (range steps))
+         stepdowns)
         (conj (gcode/relative-move config 0 0 (- z-end))))))
 
 (defn radius-scale
