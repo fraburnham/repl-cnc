@@ -11,6 +11,7 @@
   "Calculate the relative moves needed for a given tool config to reach but not exceed end point
    stepover amount should always be positive"
   [tool-width stepover-amount end]
+  {:pre [(pos? tool-width)]}
   (let [sign (if (pos? end) + -)
         end (Math/abs end)]
     (loop [stepovers []
