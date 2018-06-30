@@ -15,7 +15,7 @@
   (let [sign (if (pos? end) + -)
         end (Math/abs end)]
     (loop [stepovers []
-           distance-remaining (- end tool-width)] ;; initial hole (should add the 0th stepover then...
+           distance-remaining end]
       (if (zero? distance-remaining)
         stepovers
         (let [stepover (next-stepover tool-width stepover-amount distance-remaining)]
