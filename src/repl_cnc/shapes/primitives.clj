@@ -15,14 +15,32 @@
   (let [sign (if (pos? end) + -)
         end (Math/abs end)
         stepover-amount (Math/abs stepover-amount)]
-    (loop [stepovers []
-           distance-remaining end]
-      (if (zero? distance-remaining)
+    (loop [stepovers [0]
+           distance-remaining (- end tool-width)]
+      (if (or (zero? distance-remaining)
+              (neg? distance-remaining))
         stepovers
         (let [stepover (next-stepover tool-width stepover-amount distance-remaining)]
           (recur (conj stepovers
                        (sign stepover))
                  (- distance-remaining stepover)))))))
+
+(defn stepdowns ; there is probably a way to consolidate stepovers and stepdowns. I need to sort that out.
+  "Calculate the relative moves needed for a given tool config to reach but not exceed end point
+   stepover amount should always be positive"
+  [plunge-depth end]
+  {:pre [(pos? plunge-depth)]}
+  (let [sign (if (pos? end) + -)
+        end (Math/abs end)]
+    (loop [stepdowns [] ; Don't need the 0th step for step downs. Assume we're _above_ the material to start
+           distance-remaining end]
+      (if (or (zero? distance-remaining)
+              (neg? distance-remaining))
+        stepdowns
+        (let [stepdown (next-stepover plunge-depth 1 distance-remaining)]
+          (recur (conj stepdowns
+                       (sign stepdown))
+                 (- distance-remaining stepdown)))))))
 
 (defn end-offset
   "End accounting for tool width"
@@ -39,7 +57,7 @@
    z-end and plunge-depth-mm will be negative"
   [config x-end y-end z-end]
   ;; protect against invalid pluge-depth rates
-  (let [stepdowns (stepovers (Math/abs (:plunge-depth config)) 1 z-end) ; gotta make sure these work w/ negatives innit
+  (let [stepdowns (stepdowns (Math/abs (:plunge-depth config)) z-end) ; gotta make sure these work w/ negatives innit
         cut-direction-map {0 + ; this seems fragile
                            1 -}]
     (-> (reduce
@@ -73,7 +91,7 @@
   "Doesn't account for any home reference except bottom for now"
   [config radius z-end]
   ;; There is a gcode to change the plane for the arc! 2.5d repl carving
-  (let [stepdowns (stepovers (Math/abs (:plunge-depth config)) 1 z-end)]
+  (let [stepdowns (stepdowns (Math/abs (:plunge-depth config)) z-end)]
     (-> (reduce
          (fn [r stepdown]
            (conj r
@@ -94,7 +112,7 @@
                         (last radii)
                         stepover-distance)))
          [0]
-         stepovers)
+         (rest stepovers)) ; ugh more hacky shit. Something is horribly wrong in here
         (map #(- (+ offset %))))))
 
 (defn circle-pocket
@@ -108,5 +126,5 @@
               (-> (conj steps (gcode/relative-move config 0 y-step 0))
                   (into (arc-pocket config radius z-end))))
             []
-            (->> (interleave (into [0] stepovers) radii)
+            (->> (interleave stepovers radii)
                  (partition 2)))))
