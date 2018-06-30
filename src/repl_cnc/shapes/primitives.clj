@@ -13,7 +13,8 @@
   [tool-width stepover-amount end]
   {:pre [(pos? tool-width)]}
   (let [sign (if (pos? end) + -)
-        end (Math/abs end)]
+        end (Math/abs end)
+        stepover-amount (Math/abs stepover-amount)]
     (loop [stepovers []
            distance-remaining end]
       (if (zero? distance-remaining)
