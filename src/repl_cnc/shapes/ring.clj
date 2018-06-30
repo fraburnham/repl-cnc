@@ -16,7 +16,7 @@
        (-> (conj steps (gcode/relative-move config 0 y-step 0))
            (into (primitives/arc-pocket config radius z-end))))
      []
-     (->> (interleave (into [0] stepovers) radii)
+     (->> (interleave stepovers radii)
           (partition 2)))))
 
 (defn surface
