@@ -120,7 +120,7 @@
   [config diameter z-end stepover-amount]
   ;; use half of tool width since we're working w/ radius stepovers (and double stepover since it is a pct of total tool)
   ;; this math is stupid. Fix it (after tests are added)
-  (let [stepovers (stepovers (float (/ (:tool-width config) 2)) (* stepover-amount 2) (float (/ diameter 2)))
+  (let [stepovers (stepovers (:tool-width config) stepover-amount (float (/ diameter 2)))
         radii (radius-scale stepovers)]
     (reduce (fn [steps [y-step radius]]
               (-> (conj steps (gcode/relative-move config 0 y-step 0))
@@ -128,3 +128,13 @@
             []
             (->> (interleave stepovers radii)
                  (partition 2)))))
+
+
+(defn router-circle-pocket
+  "The tool doesn't have the ability to plunge. Assumes a hole of the needed depth has already been created."
+  [config diameter z-end stepover-amount] ; config diameter depth stepover-pct
+  ;; fix the stepovers math in here don't copy it
+  (let [last-step (float (/ diameter 2)) ; why float so soon?
+        tool-width (:tool-width config)
+        stepovers (stepovers tool-width stepover-amount last-step)]
+    stepovers))
