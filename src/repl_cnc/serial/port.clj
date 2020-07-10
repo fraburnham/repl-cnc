@@ -2,7 +2,9 @@
   (:require [clojure.java.io :as io]
             [com.stuartsierra.component :as component]
             [repl-cnc.serial.proto :as serial])
-  (:import [com.fazecast.jSerialComm SerialPort]))
+  (:import [com.fazecast.jSerialComm SerialPort]
+           [java.util Calendar]
+           [java.text SimpleDateFormat]))
 
 ;; interface w/ serial library, read & write fns in here
 (def baud-rates
@@ -97,6 +99,6 @@
 
   serial/CNCPortWriter
   (write-data [cnc-port data]
-    ;; debug log
-    (println "Writing:" data)
+    ;; debug log (should use actual logging...)
+    (println "[" (.format (SimpleDateFormat. "yyyy-MM-dd'T'HH:mm:ss.SSSZ") (.getTime (Calendar/getInstance))) "] Writing:" data)
     (write-bytes port (.getBytes (str data "\n")))))
