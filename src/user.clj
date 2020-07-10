@@ -7,7 +7,8 @@
             [repl-cnc.shapes
              [primitives :as shapes]
              [ring :as ring]]
-            [repl-cnc.serial.proto :as serial]))
+            [repl-cnc.serial.proto :as serial]
+            [repl-cnc.file :as file]))
 
 (defonce system nil)
 
