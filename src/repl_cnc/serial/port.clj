@@ -39,37 +39,6 @@
   (-> (map mode-flag-lookup mode-flags)
       mode-or))
 
-(defn bytes-to-read [port]
-  "Return bytes waiting or 1"
-  (if (zero? (.bytesAvailable port))
-    1
-    (.bytesAvailable port)))
-
-(defn join-byte-arrays [a b]
-  (let [r (byte-array (+ (count a) (count b)) a)]
-    (doall
-     (for [i (range (count b))]
-       (aset-byte r (+ i (count a)) (nth b i))))
-    r))
-
-(defn end-of-data? [data-bytes]
-  (let [data-str (String. data-bytes)]
-    (or (.contains data-str "ok\r\n")
-        (.contains data-str "error"))))
-
-(defn read-bytes [port & last-bytes] ; this strategy is working for now. It blocks until the board confirms with "ok\r\n" (or "error <some message>")
-  (let [bytes-waiting (bytes-to-read port)
-        data-bytes (byte-array bytes-waiting)]
-    (.readBytes port data-bytes bytes-waiting)
-    ;; this is so ugly. I think I'm missing some better functional thing
-    (let [joined-bytes (join-byte-arrays (first last-bytes) data-bytes)]
-      (if (end-of-data? joined-bytes)
-        joined-bytes
-        (read-bytes port joined-bytes)))))
-
-(defn write-bytes [port data-bytes]
-  (.writeBytes port data-bytes (count data-bytes)))
-
 (defrecord CNCPort [port mode-flags read-timeout write-timeout baud-rate]
   component/Lifecycle
   (start [cnc-port]
@@ -94,11 +63,18 @@
 
   serial/CNCPortReader
   (read-data [cnc-port]
-    ;; debug log
-    (String. (read-bytes port)))
+    (let [lines (transient [])]
+      (while (not (zero? (.bytesAvailable port)))
+        (let [available (.bytesAvailable port)
+              bytes (byte-array available)]
+          (.readBytes port bytes available)
+          (conj! lines (String. bytes))
+          (Thread/sleep 20)))
+      (persistent! lines)))
 
   serial/CNCPortWriter
   (write-data [cnc-port data]
     ;; debug log (should use actual logging...)
     (println "[" (.format (SimpleDateFormat. "yyyy-MM-dd'T'HH:mm:ss.SSSZ") (.getTime (Calendar/getInstance))) "] Writing:" data)
-    (write-bytes port (.getBytes (str data "\n")))))
+    (let [data-bytes (.getBytes (str data "\n"))]
+      (.writeBytes port data-bytes (count data-bytes)))))

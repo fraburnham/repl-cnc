@@ -15,14 +15,6 @@
 (defn status [cnc-controller]
   (serial/send-command cnc-controller "?"))
 
-(defn start-controller [cnc-controller ctrl-ch work-ch]
-  (async/go-loop [[data chan] (async/alts! [ctrl-ch work-ch])]
-    ;; maybe I should make this listen to the ctrl-ch and push abort/reset
-    ;; to the cnc that way...
-    (when (= chan work-ch)
-      (serial/send-command cnc-controller data)
-      (recur (async/alts! [ctrl-ch work-ch])))))
-
 ;; improve naming in here!
 (defrecord CNCController [cnc-port controller ctrl-ch work-ch]
   component/Lifecycle
@@ -44,11 +36,21 @@
     ;; started protection
     (serial/write-data cnc-port data)
     ;; waiting for the read like this can block the serial port and stop me from aborting a job!
-    (serial/read-data cnc-port))
+    ;; but it prevents too much work from being sent and dropped by the board
+    (loop [response (serial/read-data cnc-port)]
+      ;; if the response is blank keep trying, else add in success/error handling
+      (if (empty? response)
+        (do
+          (Thread/sleep 10)
+          (recur (serial/read-data cnc-port)))
+        response)))
 
   serial/CNCJobExecutor
   (execute-job [cnc-controller job]
     (async/go
       ;; protect to make sure component is started
+      ;; needs to listen to a ctrl-ch to be stoppable
       (doseq [gcode job]
-        (async/>! work-ch gcode)))))
+        (doseq [response-chunk (serial/send-command cnc-controller gcode)]
+          (print response-chunk))
+        (println)))))

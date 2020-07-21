@@ -9,7 +9,7 @@
 (defn cnc-system [port-name]
   (component/system-map
    :cnc-port (cnc-port/map->CNCPort {:port (cnc-port/get-port port-name)
-                                     :mode-flags [:read-semi-blocking :write-semi-blocking]
+                                     :mode-flags [:read-blocking :write-blocking]
                                      :read-timeout 1000 ; make conf-able
                                      :write-timeout 1000
                                      :baud-rate (:grbl cnc-port/baud-rates)})
