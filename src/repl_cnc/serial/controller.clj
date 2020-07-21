@@ -22,8 +22,7 @@
     (let [ctrl-ch (async/chan)
           work-ch (async/chan 1024)]
       (-> (assoc cnc-controller :ctrl-ch ctrl-ch)
-          (assoc :work-ch work-ch)
-          (assoc :controller (start-controller cnc-controller ctrl-ch work-ch)))))
+          (assoc :work-ch work-ch))))
 
   (stop [cnc-controller]
     (async/>!! ctrl-ch :stop)
