@@ -49,43 +49,25 @@
     end
     (- end tool-width)))
 
-;; add some consideration for mill style
-;; for now just do single passes if the mill style is set (assume the caller knows the details)
-;; this is to get around some shitty edges in ebony line-pockets
-(defn line-pocket
-  "Assumes you're starting from relative zero
-   z-end and plunge-depth-mm will be negative"
-  [config x-end y-end z-end]
-  ;; protect against invalid pluge-depth rates
-  (let [stepdowns (stepdowns (Math/abs (:plunge-depth config)) z-end) ; gotta make sure these work w/ negatives innit
-        cut-direction-map {0 + ; this seems fragile
-                           1 -}]
-    (-> (reduce
-         (fn [r [i stepdown]]
-           (let [cut-direction-modifier (get cut-direction-map (mod i 2))]
-             (conj r
-                   (gcode/plunge config stepdown)
-                   (gcode/relative-move config
-                                        (cut-direction-modifier
-                                         (end-offset (:tool-width config) x-end))
-                                        (cut-direction-modifier
-                                         (end-offset (:tool-width config) y-end))
-                                        0))))
-         []
-         (->> (interleave (range (count stepdowns)) stepdowns)
-              (partition 2)))
-        (conj (gcode/plunge config (- z-end))))))
+(defn square-surface
+  [config x-end y-end stepover-amount]
+  (let [adj-x-end ((if (pos? x-end) - +) x-end (:tool-width config))]
+    (mapcat (fn [y-step x-direction]
+              [(gcode/relative-move config 0 y-step 0)
+               (gcode/relative-move config (x-direction adj-x-end) 0 0)])
+            (stepovers (:tool-width config) stepover-amount y-end)
+            (interleave (repeat +) (repeat -)))))
 
 (defn square-pocket
   "Recursively build the box hole steps assuming bounds are max limits for the outside of the tool"
   [config x-end y-end z-end stepover-amount]
-  (-> (reduce (fn [steps y-step]
-                (-> (conj steps (gcode/relative-move config 0 y-step 0))
-                    (into (line-pocket config x-end 0 z-end))))
-              ;; the local home here is unused, I should be able to use it after each line-pocket
-              ;; If I set it before each line-pocket
-              (into [gcode/local-home] (line-pocket config x-end 0 z-end))
-              (stepovers (:tool-width config) stepover-amount y-end))))
+  (let [surface-moves (square-surface config x-end y-end stepover-amount)]
+    (reduce (fn [steps z-step]
+              (-> (into steps [(gcode/relative-move config 0 0 z-step)])
+                  (into surface-moves)
+                  (conj (gcode/absolute-move config 0 0 nil))))
+            [gcode/local-home]
+            (stepdowns (:plunge-depth config) z-end))))
 
 (defn arc-pocket
   "Doesn't account for any home reference except bottom for now"

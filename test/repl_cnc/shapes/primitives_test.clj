@@ -28,6 +28,67 @@
     (sut/stepdowns 3 -2) [-2])
 
   (t/is (thrown? AssertionError (sut/stepdowns 0 1))))
+
+(t/deftest square-pocket-test
+  (let [config {:feedrate 100
+                :plunge-feedrate 100
+                :plunge-depth 1
+                :tool-width 1}]
+    (t/are [x-end y-end z-end stepover expected] (= (sut/square-pocket config x-end y-end z-end stepover) expected)
+      5 5 -1 1 [gcode/local-home
+                (gcode/relative-move config 0 0 -1)
+                (gcode/relative-move config 0 0 0)  ; the 0th stepover...
+                (gcode/relative-move config 4 0 0)
+                (gcode/relative-move config 0 1 0)
+                (gcode/relative-move config -4 0 0)
+                (gcode/relative-move config 0 1 0)
+                (gcode/relative-move config 4 0 0)
+                (gcode/relative-move config 0 1 0)
+                (gcode/relative-move config -4 0 0)
+                (gcode/relative-move config 0 1 0)
+                (gcode/relative-move config 4 0 0)
+                (gcode/absolute-move config 0 0 nil)]
+
+      -5 5 -1 1 [gcode/local-home
+                (gcode/relative-move config 0 0 -1)
+                (gcode/relative-move config 0 0 0)
+                (gcode/relative-move config -4 0 0)
+                (gcode/relative-move config 0 1 0)
+                (gcode/relative-move config 4 0 0)
+                (gcode/relative-move config 0 1 0)
+                (gcode/relative-move config -4 0 0)
+                (gcode/relative-move config 0 1 0)
+                (gcode/relative-move config 4 0 0)
+                (gcode/relative-move config 0 1 0)
+                (gcode/relative-move config -4 0 0)
+                (gcode/absolute-move config 0 0 nil)]
+      
+      5 5 -2 1 [gcode/local-home
+                (gcode/relative-move config 0 0 -1)
+                (gcode/relative-move config 0 0 0)
+                (gcode/relative-move config 4 0 0)
+                (gcode/relative-move config 0 1 0)
+                (gcode/relative-move config -4 0 0)
+                (gcode/relative-move config 0 1 0)
+                (gcode/relative-move config 4 0 0)
+                (gcode/relative-move config 0 1 0)
+                (gcode/relative-move config -4 0 0)
+                (gcode/relative-move config 0 1 0)
+                (gcode/relative-move config 4 0 0)
+                (gcode/absolute-move config 0 0 nil)
+                (gcode/relative-move config 0 0 -1)
+                (gcode/relative-move config 0 0 0)
+                (gcode/relative-move config 4 0 0)
+                (gcode/relative-move config 0 1 0)
+                (gcode/relative-move config -4 0 0)
+                (gcode/relative-move config 0 1 0)
+                (gcode/relative-move config 4 0 0)
+                (gcode/relative-move config 0 1 0)
+                (gcode/relative-move config -4 0 0)
+                (gcode/relative-move config 0 1 0)
+                (gcode/relative-move config 4 0 0)
+                (gcode/absolute-move config 0 0 nil)])))
+
 (t/deftest arc-pocket-test
   (let [config {:feedrate 100
                 :plunge-feedrate 100
