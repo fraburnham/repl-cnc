@@ -118,23 +118,12 @@
 (defn circle-pocket
   "The start of the hole is centroid"
   [config diameter z-end stepover-amount]
-  ;; use half of tool width since we're working w/ radius stepovers (and double stepover since it is a pct of total tool)
-  ;; this math is stupid. Fix it (after tests are added)
-  (let [stepovers (stepovers (:tool-width config) stepover-amount (float (/ diameter 2)))
-        radii (radius-scale stepovers)]
-    (reduce (fn [steps [y-step radius]]
-              (-> (conj steps (gcode/relative-move config 0 y-step 0))
-                  (into (arc-pocket config radius z-end))))
-            []
-            (->> (interleave stepovers radii)
-                 (partition 2)))))
-
-
-(defn router-circle-pocket
-  "The tool doesn't have the ability to plunge. Assumes a hole of the needed depth has already been created."
-  [config diameter z-end stepover-amount] ; config diameter depth stepover-pct
-  ;; fix the stepovers math in here don't copy it
-  (let [last-step (float (/ diameter 2)) ; why float so soon?
-        tool-width (:tool-width config)
-        stepovers (stepovers tool-width stepover-amount last-step)]
-    stepovers))
+  ;; stepovers don't really work for circles because of the radius center instead of the edge of the tool being center
+  ;; so the final stepover needs to account for half the tool width (in addition to the diameter)
+  ;; hence the hack below. TODO: make goodlier.
+  (let [stepovers (stepovers (:tool-width config) stepover-amount (+ (float (/ (+ (:tool-width config) diameter) 2))))]
+    (mapcat (fn [y-step radius]
+              (into [(gcode/relative-move config 0 y-step 0)]
+                    (arc-pocket config radius z-end)))
+            stepovers
+            (radius-scale stepovers))))
